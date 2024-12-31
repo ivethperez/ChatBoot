@@ -10,10 +10,10 @@ class MessageHandler {
   async handleIncomingMessage(message, senderInfo) {
     const cleanPhoneNumber = (number) => { return number.startsWith('521') ? number.replace("521", "52") : number; }
 
-    console.log(message?.type);
+    // console.log(message?.type);
     if (message?.type === 'text') {
       const incomingMessage = message.text.body.toLowerCase().trim();
-      console.log(incomingMessage);
+      // console.log(incomingMessage);
       if (this.isGreeting(incomingMessage)) {
         await this.sendWelcomeMessage(cleanPhoneNumber(message.from), message.id, senderInfo);
         await this.sendWelcomeMenu(cleanPhoneNumber(message.from));
@@ -26,7 +26,7 @@ class MessageHandler {
       }
       else {
         await this.sendWelcomeMessage(cleanPhoneNumber(message.from), message.id, senderInfo);
-        await this.sendOtherOption(cleanPhoneNumber(message.from));
+        await this.sendMenuPrincipal(cleanPhoneNumber(message.from));
       }
 
       await whatsappService.markAsRead(message.id);
@@ -36,7 +36,13 @@ class MessageHandler {
     }
     else if (message?.type === 'interactive') {
       const option = message?.interactive?.button_reply?.id;
-      await this.handleMenuOption(cleanPhoneNumber(message.from), option);
+      const optionlist = message?.interactive?.list_reply?.id;
+      if (optionlist !== undefined) {
+        await this.handleMenuOption(cleanPhoneNumber(message.from), optionlist);
+      }
+      if (option !== undefined) {
+        await this.handleMenuOption(cleanPhoneNumber(message.from), option);
+      }
       await whatsappService.markAsRead(message.id);
     }
   }
@@ -45,7 +51,7 @@ class MessageHandler {
     return greetings.includes(message);
   }
   isResponseTransfer(message) {
-    const responseTransfer = ["transferencia", "solicita los datos para transferir","tarjeta de crédito"];
+    const responseTransfer = ["transferencia", "solicita los datos para transferir", "tarjeta de crédito"];
     return responseTransfer.every(x => message.includes(x.toLowerCase()));
   }
   isResponseCash(message) {
@@ -77,13 +83,13 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
   }
 
   async sendForMenuOrOrder(to) {
-    const menuMessage = "¿Deseas ordenar o ? 🥢✨"
+    const menuMessage = "¿Deseas ordenar o volver al menú principal ? 🥢✨"
     const buttons = [
       {
-        type: 'reply', reply: { id: 'option_3', title: 'Ordenar' }
+        type: 'reply', reply: { id: 'option_10', title: 'Ordenar' }
       },
       {
-        type: 'reply', reply: { id: 'option_4', title: 'Ver menú' }
+        type: 'reply', reply: { id: 'option_11', title: 'Menú principal' }
       }
     ];
     await whatsappService.sendInteractiveButtons(to, menuMessage, buttons);
@@ -115,42 +121,112 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
     ];
     await whatsappService.sendInteractiveButtons(to, menuMessage, buttons);
   }
+
+  async sendMenuPrincipal(to) {
+    const menuMessage = "Te mostramos nuestro menú de opciones:"
+    const sections = [
+      {
+        title: '¿Cómo podemos ayudarte?',
+        rows: [
+          { id: 'option_16', title: 'Ordenar', description: '' },
+          {
+            id: 'option_3', title: 'Promociones vigentes', description: 'Promoción cumpleaños, promoción semanal,cupón de descuento'
+          },
+          {
+            id: 'option_4', title: 'Ver menú', description: 'Promocion cumpleaños'
+          }, {
+            id: 'option_5', title: 'Horarios de atención', description: 'Te compartimos nuestros horarios'
+          },
+          { id: 'option_6', title: 'Ubicación', description: 'Te compartimos nuestra ubicaión, visitanos en...' },
+          {
+            id: 'option_7', title: 'Servicio a domicilio', description: 'Contamos con servicio a domicilio, selecciona para ver más información'
+          },
+          {
+            id: 'option_8', title: 'Preguntas frecuentes', description: '¿Te podemos ayudar con otra duda?'
+          },
+          {
+            id: 'option_9', title: 'Contacto', description: 'Para dudas especificas o aclaraciones, ¡contactanos!'
+          }
+        ]
+
+      }
+    ];
+    await whatsappService.sendtolistMessage(to, menuMessage, sections);
+  }
   async handleMenuOption(to, option) {
     switch (option) {
+      // ----------------------Bienvenida --------------------
       case 'option_1':
         await whatsappService.sendMessage(to, "🎉Te regalamos el siguiente código de descuento para tu primera compra: *KORAT1*");
-        // await this.sendMedia(to, option);
-        await this.sendForOrder(to);
+        await this.sendMenuPrincipal(to);
         break;
       case 'option_2':
-        await this.sendOtherOption(to);
-        // await this.mesaggeOrder(to);
+        await this.sendMenuPrincipal(to);
         break
+
+      // ----------------------Menú principal --------------------
       case 'option_3':
-        await this.mesaggeOrder(to);
+        await this.sendMedia(to, option);
+        await this.sendForMenuOrOrder(to);
         break
       case 'option_4':
         await this.sendMedia(to, option);
-        await this.sendForOrder(to);
+        await this.sendForMenuOrOrder(to);
         break
       case 'option_5':
-        await this.mesaggeOrder(to);
+        await whatsappService.sendMessageWithURL(to, 'https://www.google.com/search?sa=X&sca_esv=6c31e4139d9f0bec&rlz=1C1ALOY_esMX973MX974&sxsrf=ADLYWILFsq443HdAmORvt66tR_NZ51Qk4Q:1735586099631&q=korat+cocina+oriental+horario&ludocid=3964308768138710697&ved=2ahUKEwjrg8iHmtCKAxW-QjABHZ2sFLcQ6BN6BAhMEBg&biw=1280&bih=593&dpr=1.5#loh=true');
+        await this.sendForMenuOrOrder(to);
         break
       case 'option_6':
-        await this.sendOtherOption(to);
+        await this.sendLocation(to);
+        await this.sendForMenuOrOrder(to);
         break
       case 'option_7':
-        await this.mesaggeOrder(to);
+        await this.messageServiceDom(to);
+        await this.sendForMenuOrOrder(to);
         break
       case 'option_8':
-        await this.sendLocation(to);
-        await this.sendForOrder(to);
+        await this.sendMenuPreguntasFrecuentes(to);
+        await this.sendForMenuOrOrder(to);
         break
       case 'option_9':
         await this.sendContact(to);
-        await this.sendForOrder(to);
+        await this.sendForMenuOrOrder(to);
         break
-    
+
+      // ---------------Volver ---------------------------------------
+      case 'option_10':
+        await this.mesaggeOrder(to);
+        break
+
+      case 'option_11':
+        await this.sendMenuPrincipal(to);
+        break
+      // ---------------Preguntas frecuentes---------------------------
+
+
+      case 'option_12':
+        await this.sendForMenuOrOrder(to);
+        break
+
+      case 'option_13':
+        await this.sendLocation(to);
+        await this.sendForMenuOrOrder(to);
+        break
+
+      case 'option_14':
+        await this.sendForMenuOrOrder(to);
+        break
+
+      case 'option_15':
+        await whatsappService.sendMessage(to, `-Servicio a domicilio únicamente tenemos pagos con efectivo y transferencia. -Compras para llevar o en restaurante contamos con terminal aceptamos todas las tarjetas`);
+        await this.sendForMenuOrOrder(to);
+        break
+
+      case 'option_16':
+        await this.mesaggeOrder(to);
+        break
+
       default:
         await whatsappService.sendMessage(to, "Lo siento, no entendí tu selección, Por Favor, elige una de las opciones del menú.");
     }
@@ -161,33 +237,24 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
     let caption;
     let type;
     switch (option) {
-      case 'option_1':
-        mediaUrl = 'https://drive.google.com/file/d/1oOJ-EXISLlyVWGJT4npmUhiCxggud-tC/view?usp=sharing';
+      case 'option_3':
+        mediaUrl = 'https://snacksleier.com/ImagenesKorat/15.jpg';
+        caption = 'promoción semanal';
+        type = 'image';
+        break
+      case 'option_4':
+        mediaUrl = 'https://snacksleier.com/ImagenesKorat/MenúKorat.pdf';
         caption = 'Nuestro menú';
         type = 'document';
         break;
-      case 'option_0':
-        mediaUrl = 'https://storage.googleapis.com/headers-appio/pages/small_bua_37ac3fe3fa/small_bua_37ac3fe3fa.jpg';
-        caption = 'Realiza la transferencia al siguiente número de tarjeta y compartenos tu comprobante';
-        type = 'image';
-        break
-      default:
-        await whatsappService.sendMessage(to, "Lo siento, no entendí tu selección, Por Favor, elige una de las opciones del menú.");
-    }
-    // const mediaUrl = 'https://s3.amazonaws.com/gndx.dev/medpet-audio.aac';
-    // const caption = 'Bienvenida';
-    // const type = 'audio';
 
-    // const mediaUrl = 'https://s3.amazonaws.com/gndx.dev/medpet-imagen.png';
-    // const caption = '¡Esto es una Imagen!';
-    // const type = 'image';
+      default:
+        await whatsappService.sendMessage(to, "Lo siento, no entendí tu selección");
+    }
 
     // const mediaUrl = 'https://s3.amazonaws.com/gndx.dev/medpet-video.mp4';
     // const caption = '¡Esto es una video!';
     // const type = 'video';
-
-
-
     await whatsappService.sendMediaMessage(to, type, mediaUrl, caption);
   }
   async sendContact(to) {
@@ -247,12 +314,43 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
 
     await whatsappService.sendLocationMessage(to, latitude, longitude, name, address);
   }
+  async sendMenuPreguntasFrecuentes(to) {
+    const menuMessage = "Preguntas frecuentes:"
+    const sections = [
+      {
+        title: 'Preguntas',
+        rows: [
+          {
+            id: 'option_12', title: '¿Realizan reservaciones?', description: 'Sí ,Selecciona para reservar'
+          },
+          {
+            id: 'option_13', title: '¿Área para mascotas?', description: 'Si ,fuera del restaurante contamos con área para mascotas'
+          }, {
+            id: 'option_14', title: 'Tiempo de entrega', description: 'De 30 a 45minutos'
+          },
+          { id: 'option_15', title: 'Metodos de pago', description: 'Selecciona para ver más información' }
+        ]
+
+      }
+    ];
+    await whatsappService.sendlistMessage(to, menuMessage, sections);
+  }
   async mesaggeExit(to) {
     await whatsappService.sendMessage(to, "Tu pedido ha sido confirmado.🎊");
   }
   async mesaggeOrder(to) {
-    await whatsappService.sendMessageWithURL(to, 'Ve nuestro menú y crea tu pedio en el siguiente link y regresa para continuar... https://koratcocinaoriental.ola.click/products');
+    await whatsappService.sendMessageWithURL(to, 'Crea tu pedio en el siguiente link y regresa para continuar... https://koratcocinaoriental.ola.click/products');
   }
-
+  async messageServiceDom(to) {
+    await whatsappService.sendMessage(to, `Si contamos con el servicio , es un costo adicional dependiendo la distancia del restaurante a su Domicilio ! 
+- [ ] Tarifa de envíos 
+🚨$40 de 0 a 3 km
+🚨$50 de 3.1 a 5 km
+🚨$60 de 5.1 a 7km
+🚨$70 de 7.1 a 9 km
+🚨$80 de 9.1 a 11 km
+🚨$10 por km extra despues de los 11
+`);
+  }
 }
 export default new MessageHandler();

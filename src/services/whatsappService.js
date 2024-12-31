@@ -105,5 +105,56 @@ class WhatsAppService {
     
     await sendToWhatsApp(data);
   }
+  async sendtolistMessage(to, bodyText, sections) {
+    const data = {
+      messaging_product: 'whatsapp',
+      to,
+      context: {
+        message_id: '<MSGID_OF_PREV_MSG>'
+    },
+      type: 'interactive',
+      interactive: {
+        type: 'list',
+        header:{
+          type: 'text',
+          text: 'Menú de opciones',
+        },
+        body: { text: bodyText },
+        footer:{
+            text: ''
+        },
+        action: {
+          button:'Menú de opciones',
+          sections: sections,
+        },
+      },
+    };
+
+    await sendToWhatsApp(data);
+  }
+  async sendlistMessage(to, bodyText, sections) {
+    const data = {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'list',
+        header:{
+          type: 'text',
+          text: 'Preguntas frecuentes',
+        },
+        body: { text: bodyText },
+        footer:{
+            text: ''
+        },
+        action: {
+          button:'Menú de opciones',
+          sections: sections,
+        },
+      },
+    };
+
+    await sendToWhatsApp(data);
+  }
 }
 export default new WhatsAppService();
