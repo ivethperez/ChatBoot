@@ -1,5 +1,5 @@
 import whatsappService from './whatsappService.js';
-
+import appendToSheet from './googleSheetsService.js';
 class MessageHandler {
 
   constructor() {
@@ -10,13 +10,14 @@ class MessageHandler {
   async handleIncomingMessage(message, senderInfo) {
     const cleanPhoneNumber = (number) => { return number.startsWith('521') ? number.replace("521", "52") : number; }
 
-    // console.log(message?.type);
     if (message?.type === 'text') {
       const incomingMessage = message.text.body.toLowerCase().trim();
-      // console.log(incomingMessage);
       if (this.isGreeting(incomingMessage)) {
         await this.sendWelcomeMessage(cleanPhoneNumber(message.from), message.id, senderInfo);
         await this.sendWelcomeMenu(cleanPhoneNumber(message.from));
+      }
+      else if (this.appointmentState[cleanPhoneNumber(message.from)]) {
+        await this.handleAppointmentFlow(cleanPhoneNumber(message.from), incomingMessage);
       }
       else if (this.isResponseTransfer(incomingMessage)) {
         await this.sendMedia(cleanPhoneNumber(message.from), 'option_0');
@@ -28,7 +29,6 @@ class MessageHandler {
         await this.sendWelcomeMessage(cleanPhoneNumber(message.from), message.id, senderInfo);
         await this.sendMenuPrincipal(cleanPhoneNumber(message.from));
       }
-
       await whatsappService.markAsRead(message.id);
     }
     else if (message?.type === 'image') {
@@ -94,46 +94,30 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
     ];
     await whatsappService.sendInteractiveButtons(to, menuMessage, buttons);
   }
-  async sendForOrder(to) {
-    const menuMessage = "¿Deseas ordenar ahora? 🥢✨"
+  async sendMenuOrPreguntasF(to) {
+    const menuMessage = "¿Deseas volver a las preguntas frecuentes o al menú principal ? 🥢✨"
     const buttons = [
       {
-        type: 'reply', reply: { id: 'option_5', title: 'Sí' }
+        type: 'reply', reply: { id: 'option_17', title: 'Preguntas frecuentes' }
       },
       {
-        type: 'reply', reply: { id: 'option_6', title: 'No' }
+        type: 'reply', reply: { id: 'option_18', title: 'Menú principal' }
       }
     ];
     await whatsappService.sendInteractiveButtons(to, menuMessage, buttons);
   }
-  async sendOtherOption(to) {
-    const menuMessage = "Aquí tienes algunas opciones que pueden interesarte:"
-    const buttons = [
-      {
-        type: 'reply', reply: { id: 'option_7', title: 'Ordenar' }
-      },
-      {
-        type: 'reply', reply: { id: 'option_8', title: 'Ubicación' }
-      },
-      {
-        type: 'reply', reply: { id: 'option_9', title: 'Contacto' }
-      }
-    ];
-    await whatsappService.sendInteractiveButtons(to, menuMessage, buttons);
-  }
-
   async sendMenuPrincipal(to) {
     const menuMessage = "Te mostramos nuestro menú de opciones:"
     const sections = [
       {
         title: '¿Cómo podemos ayudarte?',
         rows: [
-          { id: 'option_16', title: 'Ordenar', description: '' },
+          { id: 'option_16', title: 'Quiero ordenar', description: 'Crea tu pedio en el siguiente link' },
           {
             id: 'option_3', title: 'Promociones vigentes', description: 'Promoción cumpleaños, promoción semanal,cupón de descuento'
           },
           {
-            id: 'option_4', title: 'Ver menú', description: 'Promocion cumpleaños'
+            id: 'option_4', title: 'Ver menú', description: 'Da click en el siguiente link',
           }, {
             id: 'option_5', title: 'Horarios de atención', description: 'Te compartimos nuestros horarios'
           },
@@ -154,6 +138,7 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
     await whatsappService.sendtolistMessage(to, menuMessage, sections);
   }
   async handleMenuOption(to, option) {
+    let response;
     switch (option) {
       // ----------------------Bienvenida --------------------
       case 'option_1':
@@ -167,11 +152,9 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
       // ----------------------Menú principal --------------------
       case 'option_3':
         await this.sendMedia(to, option);
-        await this.sendForMenuOrOrder(to);
         break
       case 'option_4':
         await this.sendMedia(to, option);
-        await this.sendForMenuOrOrder(to);
         break
       case 'option_5':
         await whatsappService.sendMessageWithURL(to, 'https://www.google.com/search?sa=X&sca_esv=6c31e4139d9f0bec&rlz=1C1ALOY_esMX973MX974&sxsrf=ADLYWILFsq443HdAmORvt66tR_NZ51Qk4Q:1735586099631&q=korat+cocina+oriental+horario&ludocid=3964308768138710697&ved=2ahUKEwjrg8iHmtCKAxW-QjABHZ2sFLcQ6BN6BAhMEBg&biw=1280&bih=593&dpr=1.5#loh=true');
@@ -206,26 +189,36 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
 
 
       case 'option_12':
-        await this.sendForMenuOrOrder(to);
+        this.appointmentState[to] = { step: 'name' }
+        await whatsappService.sendMessage(to, "¿A qué nombre quedaria la reserva?");
         break
 
       case 'option_13':
         await this.sendLocation(to);
-        await this.sendForMenuOrOrder(to);
+        await this.sendMenuOrPreguntasF(to);
         break
 
       case 'option_14':
-        await this.sendForMenuOrOrder(to);
+        await this.sendMenuOrPreguntasF(to);
         break
 
       case 'option_15':
         await whatsappService.sendMessage(to, `-Servicio a domicilio únicamente tenemos pagos con efectivo y transferencia. -Compras para llevar o en restaurante contamos con terminal aceptamos todas las tarjetas`);
-        await this.sendForMenuOrOrder(to);
+        await this.sendMenuOrPreguntasF(to);
         break
 
       case 'option_16':
-        await this.mesaggeOrder(to);
+        await this.sendMenuOrPreguntasF(to);
         break
+
+        case 'option_17':
+          await this.sendMenuPreguntasFrecuentes(to);
+          await this.sendForMenuOrOrder(to);
+          break
+
+          case 'option_18':
+            await this.sendMenuPrincipal(to);
+            break
 
       default:
         await whatsappService.sendMessage(to, "Lo siento, no entendí tu selección, Por Favor, elige una de las opciones del menú.");
@@ -243,7 +236,7 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
         type = 'image';
         break
       case 'option_4':
-        mediaUrl = 'https://snacksleier.com/ImagenesKorat/MenúKorat.pdf';
+        mediaUrl = 'https://snacksleier.com/ImagenesKorat/MenuKorat.pdf';
         caption = 'Nuestro menú';
         type = 'document';
         break;
@@ -252,10 +245,11 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
         await whatsappService.sendMessage(to, "Lo siento, no entendí tu selección");
     }
 
-    // const mediaUrl = 'https://s3.amazonaws.com/gndx.dev/medpet-video.mp4';
-    // const caption = '¡Esto es una video!';
-    // const type = 'video';
     await whatsappService.sendMediaMessage(to, type, mediaUrl, caption);
+    await this.sendForMenuOrOrderAfter(to);
+  }
+  async sendForMenuOrOrderAfter(to){
+    await this.sendForMenuOrOrder(to);
   }
   async sendContact(to) {
     const contact = {
@@ -291,8 +285,8 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
       },
       phones: [
         {
-          phone: "+1234567890",
-          wa_id: "1234567890",
+          phone: "+5219984846179",
+          wa_id: "9984846179",
           type: "WORK"
         }
       ],
@@ -315,7 +309,7 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
     await whatsappService.sendLocationMessage(to, latitude, longitude, name, address);
   }
   async sendMenuPreguntasFrecuentes(to) {
-    const menuMessage = "Preguntas frecuentes:"
+    const menuMessage = "Consulta algunas duas de nuestros clientes:"
     const sections = [
       {
         title: 'Preguntas',
@@ -339,7 +333,7 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
     await whatsappService.sendMessage(to, "Tu pedido ha sido confirmado.🎊");
   }
   async mesaggeOrder(to) {
-    await whatsappService.sendMessageWithURL(to, 'Crea tu pedio en el siguiente link y regresa para continuar... https://koratcocinaoriental.ola.click/products');
+    await whatsappService.sendMessageWithURL(to, 'https://koratcocinaoriental.ola.click/products');
   }
   async messageServiceDom(to) {
     await whatsappService.sendMessage(to, `Si contamos con el servicio , es un costo adicional dependiendo la distancia del restaurante a su Domicilio ! 
@@ -351,6 +345,61 @@ Korat no es solo un restaurante; es una puerta a nuevos mundos culinarios. Cada 
 🚨$80 de 9.1 a 11 km
 🚨$10 por km extra despues de los 11
 `);
+  }
+
+  completeAppointment(to) {
+    const appointment = this.appointmentState[to];
+    delete this.appointmentState[to];
+
+    const userData = [
+      to,
+      appointment.name,
+      appointment.fechaHora,
+      appointment.numeroPersonas,
+      appointment.reason,
+      new Date().toISOString()
+    ]
+
+     appendToSheet(userData);
+
+    return `Gracias por agendar tu cita. 
+    Resumen de tu cita:
+    
+    Nombre: ${appointment.name}
+    Día y hora: ${appointment.fechaHora}
+    Número de personas: ${appointment.numeroPersonas}
+    Evento especial: ${appointment.reason}
+    
+    Nos pondremos en contacto contigo pronto para confirmar la fecha y hora de tu cita.`
+
+  }
+
+  async handleAppointmentFlow(to, message) {
+    const state = this.appointmentState[to];
+    let response;
+
+    switch (state.step) {
+      case 'name':
+        state.name = message;
+        state.step = 'fechaHora';
+        response = '¿Qúe día y hora quieres agendar tu cita? recuerda que abrimos a partir de las 1:00 pm';
+        break;
+      case 'fechaHora':
+        state.fechaHora = message;
+        state.step = 'numeroPersonas';
+        response = '¿Para cuántas personas?';
+        break;
+      case 'numeroPersonas':
+        state.numeroPersonas = parseInt(message);
+        state.step = 'reason';
+        response = '¿Celebras algo en especia? (por ejemplo: cumpleaños, aniversario, ninguno, no)';
+        break;
+      case 'reason':
+        state.reason = message;
+        response = this.completeAppointment(to);
+        break;
+    }
+    await whatsappService.sendMessage(to, response);
   }
 }
 export default new MessageHandler();
