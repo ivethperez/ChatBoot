@@ -2,7 +2,6 @@
   "name": "whatsapp-korat",
   "version": "1.0.0",
   "main": "src/app.js",
-
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/app.js",
@@ -16,7 +15,8 @@
   "dependencies": {
     "axios": "^1.7.9",
     "dotenv": "^16.4.7",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "googleapis": "^146.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.7"
